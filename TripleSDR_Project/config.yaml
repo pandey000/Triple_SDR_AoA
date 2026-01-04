@@ -1,0 +1,74 @@
+hardware:
+  hackrf_serials:
+    r1: 0000000000000000000a063dc30282397
+    r3: 0000000000000000849860c82f8a56d7
+    r2: 000000000000000060a464dc3611620f
+  sample_rate: 15000000
+
+performance:
+  fft_size: 1024
+  buffer_size: 1.0
+
+frequency:
+  r1_start: 2405000000
+  r1_stop: 2435000000
+  r1_step: 10000000
+  r2_start: 2445000000
+  r2_stop: 2475000000
+  r2_step: 10000000
+  settling_time: 0.3
+  dwell_time: 1.2
+
+detection:
+  calibration_time: 25
+  manual_offset: 20.0
+  persistence_threshold: 8
+  window_seconds: 18.0
+  min_unique_channels: 5
+  guard_interval: 0.25
+
+aoa:
+  antenna_spacing: 0.06
+  calibration_offset: -3.050175766499434
+  sample_window: 2000
+  cooldown: 5.0
+  calibration_frequency: 2462000000.0
+  calibration_timestamp: '2025-12-29T17:18:53.239613'
+  calibration_mode: Boresight alignment, single frequency
+  calibration_note: "Calibration valid for ~6 hours or until temperature changes >10\xB0\
+    C. Re-calibrate if AoA accuracy degrades."
+
+spectral:
+  rolloff_threshold: 15.0
+  par_min: 5.0
+  par_max: 40.0
+temporal:
+  burst_duration_max: 5.0
+  hop_regularity_threshold: 0.5
+
+network:
+  udp_r1: 50000
+  udp_r2: 50002
+  zmq_r1: 60000
+  zmq_r2: 60002
+  zmq_r3: 60001
+  zmq_cmd: 50005
+
+visualization:
+  enabled: true              # Set to false to disable completely
+  update_rate: 5             # Hz (2-10 recommended)
+  web_port: 8080            # Dashboard port
+  spectrum_decimation: 4     # Send every Nth FFT point (reduces bandwidth)
+  
+  # What to display
+  show_spectrum: true
+  show_timeline: true
+  show_polar: true
+  show_metrics: true
+  show_confidence: true
+
+logging:
+  log_dir: logs
+  console_level: DEBUG
+  file_level: DEBUG
+  export_aoa: true
