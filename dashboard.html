@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triple-SDR Detection Dashboard</title>
+
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+    <style>
+        /* ============================================
+           PROFESSIONAL DARK THEME STYLING
+           ============================================ */
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+            background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 100%);
+            color: #e0e0e0;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px 30px;
+            border-bottom: 2px solid #00d9ff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0, 217, 255, 0.2);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 300;
+            letter-spacing: 2px;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4444;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-dot.connected {
+            background: #00ff88;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        /* Main Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            /* Row 1: Spectrum/Timeline, Row 2: VIDEO, Row 3: AoA/Confidence */
+            grid-template-rows: 250px 450px 250px;
+            gap: 15px;
+            padding: 20px;
+            max-width: 1920px;
+            margin: 0 auto;
+        }
+
+        /* Plot Containers */
+        .plot-container {
+            background: rgba(30, 30, 45, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 7px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 217, 255, 0.1);
+            transition: all 0.3s ease;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .plot-container:hover {
+            border-color: rgba(0, 217, 255, 0.3);
+            box-shadow: 0 12px 40px rgba(0, 217, 255, 0.2);
+        }
+
+        .plot-container h2 {
+            font-size: 14px;
+            font-weight: 400;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+            color: #00d9ff;
+            text-transform: uppercase;
+            padding-left: 10px;
+        }
+
+        /* =========================================
+           GRID PLACEMENT LOGIC (REVISED)
+           ========================================= */
+
+        /* Row 1: Spectrums + Timeline */
+        #spectrum-r1 {
+            grid-column: 1;
+            grid-row: 1;
+        }
+
+        #spectrum-r2 {
+            grid-column: 2;
+            grid-row: 1;
+        }
+
+        #timeline {
+            grid-column: 3;
+            grid-row: 1;
+        }
+
+        /* Moved Timeline to Top Right */
+
+        /* Row 2: VIDEO FEED (Full Width) */
+        #video-panel {
+            grid-column: 1 / span 3;
+            grid-row: 2;
+            background: #000;
+            /* Black background for video */
+            padding: 0;
+            position: relative;
+        }
+
+        /* Row 3: Data */
+        #polar-aoa {
+            grid-column: 1;
+            grid-row: 3;
+        }
+
+        #confidence-panel {
+            grid-column: 2 / span 2;
+            grid-row: 3;
+        }
+
+        /* Video Feed Specifics */
+        .video-wrapper {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .video-wrapper img {
+            height: 100%;
+            max-width: 100%;
+            object-fit: contain;
+        }
+
+        /* Timeline specific styling */
+        #timeline-content {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        #timeline-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #timeline-content::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        #timeline-content::-webkit-scrollbar-thumb {
+            background: rgba(0, 217, 255, 0.5);
+            border-radius: 4px;
+        }
+
+        .event-item {
+            padding: 6px 10px;
+            margin-bottom: 4px;
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 3px solid #00d9ff;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            transition: all 0.2s ease;
+        }
+
+        .event-item.confirmed {
+            border-left-color: #00ff88;
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .event-item .time {
+            color: #888;
+            margin-right: 5px;
+        }
+
+        .event-item .freq {
+            color: #00d9ff;
+            font-weight: bold;
+        }
+
+        /* Confidence Bars */
+        .confidence-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            padding: 10px;
+        }
+
+        .confidence-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .confidence-label {
+            width: 140px;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        .confidence-bar {
+            flex: 1;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff4444, #ffaa00, #00ff88);
+            transition: width 0.3s ease;
+        }
+
+        .confidence-value {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 11px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Responsive */
+        @media (max-width: 1000px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
+            }
+
+            #spectrum-r1,
+            #spectrum-r2,
+            #timeline,
+            #video-panel,
+            #polar-aoa,
+            #confidence-panel {
+                grid-column: 1;
+                grid-row: auto;
+            }
+
+            #video-panel {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>⚡ TRIPLE-SDR DETECTION SYSTEM</h1>
+        <div class="status-indicator">
+            <div class="status-dot" id="status-dot"></div>
+            <span id="status-text">Connecting...</span>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="plot-container" id="spectrum-r1">
+            <h2>Radio 1 Spectrum</h2>
+            <div id="spectrum-r1-plot" style="flex:1;"></div>
+        </div>
+
+        <div class="plot-container" id="spectrum-r2">
+            <h2>Radio 2 Spectrum</h2>
+            <div id="spectrum-r2-plot" style="flex:1;"></div>
+        </div>
+
+        <div class="plot-container" id="timeline">
+            <h2>Detection Timeline</h2>
+            <div id="timeline-content">
+                <div class="no-data" style="color:#666; font-style:italic; padding:10px;">No detections yet</div>
+            </div>
+        </div>
+
+        <div class="plot-container" id="video-panel">
+            <div class="video-wrapper">
+                <img src="http://10.42.0.2:5000/video_feed" alt="EO System Offline - Check Connection">
+            </div>
+        </div>
+
+        <div class="plot-container" id="polar-aoa">
+            <h2>Angle of Arrival</h2>
+            <div id="polar-aoa-plot" style="flex:1;"></div>
+        </div>
+
+        <div class="plot-container" id="confidence-panel">
+            <h2>Detection Confidence</h2>
+            <div class="confidence-grid" id="confidence-content">
+                <div class="no-data" style="color:#666; padding:10px;">No active detection</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // WebSocket Connection & Data Handling
+        // ============================================
+
+        let ws = null;
+        let reconnectInterval = null;
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+
+        function connect() {
+            const wsUrl = `ws://${window.location.host}/ws`;
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                statusDot.classList.add('connected');
+                statusText.textContent = 'Connected';
+                clearInterval(reconnectInterval);
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                updateDashboard(data);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                statusDot.classList.remove('connected');
+                statusText.textContent = 'Disconnected';
+
+                // Auto-reconnect
+                if (!reconnectInterval) {
+                    reconnectInterval = setInterval(() => {
+                        console.log('Attempting reconnect...');
+                        connect();
+                    }, 3000);
+                }
+            };
+        }
+
+        // ============================================
+        // Plotly Initialization
+        // ============================================
+
+        const plotConfig = { displayModeBar: false, responsive: true };
+
+        // Common Layout for Spectrums
+        const commonLayout = {
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0.3)',
+            font: { color: '#e0e0e0', size: 10 },
+            margin: { l: 30, r: 10, t: 30, b: 20 },
+            xaxis: { gridcolor: 'rgba(255,255,255,0.1)' },
+            yaxis: { range: [-100, 0], gridcolor: 'rgba(255,255,255,0.1)' }
+        };
+
+        // Initialize R1
+        Plotly.newPlot('spectrum-r1-plot', [{
+            y: new Array(256).fill(-100), type: 'scatter', mode: 'lines',
+            line: { color: '#00d9ff', width: 1.5 }, fill: 'tozeroy'
+        }], { ...commonLayout, title: { text: '2400-2430 MHz', font: { color: '#00d9ff' } } }, plotConfig);
+
+        // Initialize R2
+        Plotly.newPlot('spectrum-r2-plot', [{
+            y: new Array(256).fill(-100), type: 'scatter', mode: 'lines',
+            line: { color: '#ff00ff', width: 1.5 }, fill: 'tozeroy'
+        }], { ...commonLayout, title: { text: '2445-2475 MHz', font: { color: '#ff00ff' } } }, plotConfig);
+
+        // Initialize Polar
+        Plotly.newPlot('polar-aoa-plot', [{
+            type: 'scatterpolar', r: [], theta: [], mode: 'markers'
+        }], {
+            polar: {
+                bgcolor: 'rgba(0,0,0,0.3)',
+                radialaxis: { visible: false, range: [0, 1] },
+                angularaxis: { rotation: 90, direction: 'clockwise', gridcolor: 'rgba(255,255,255,0.2)' }
+            },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            margin: { l: 20, r: 20, t: 20, b: 20 }
+        }, plotConfig);
+
+        // ============================================
+        // Dashboard Update Functions
+        // ============================================
+
+        function updateDashboard(data) {
+            updateSpectrum('spectrum-r1-plot', data.spectrum_r1);
+            updateSpectrum('spectrum-r2-plot', data.spectrum_r2);
+            updateTimeline(data.events);
+            updatePolar(data.aoa);
+            // Metrics Removed - Video Feed is Static HTML
+            updateConfidence(data.confidence);
+        }
+
+        function updateSpectrum(plotId, spectrum) {
+            if (!spectrum || spectrum.length === 0) return;
+            Plotly.react(plotId, [{
+                y: spectrum,
+                type: 'scatter', mode: 'lines',
+                line: { color: plotId.includes('r1') ? '#00d9ff' : '#ff00ff', width: 1.5 },
+                fill: 'tozeroy'
+            }], { ...commonLayout }, plotConfig);
+        }
+
+        function updateTimeline(events) {
+            const container = document.getElementById('timeline-content');
+            if (!events || events.length === 0) {
+                container.innerHTML = '<div class="no-data" style="padding:10px; color:#666;">No detections yet</div>';
+                return;
+            }
+
+            let html = '';
+            const displayEvents = events.slice(-15).reverse(); // Show last 15
+
+            displayEvents.forEach(e => {
+                const confirmedClass = e.confirmed ? 'confirmed' : '';
+                html += `
+                    <div class="event-item ${confirmedClass}">
+                        <span class="time">${e.time}</span>
+                        <span class="freq">${e.freq} MHz</span>
+                        <span style="float:right; opacity:0.7;">${e.radio}</span>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function updatePolar(aoaHistory) {
+            if (!aoaHistory || aoaHistory.length === 0) return;
+            const latest = aoaHistory[aoaHistory.length - 1];
+
+            Plotly.react('polar-aoa-plot', [{
+                type: 'scatterpolar',
+                r: [1], theta: [latest.angle],
+                mode: 'markers',
+                marker: { size: 15, color: '#ff4444', line: { color: '#fff', width: 2 } }
+            }]);
+        }
+
+        function updateConfidence(confidence) {
+            if (!confidence || !confidence.active) {
+                document.getElementById('confidence-content').innerHTML =
+                    '<div class="no-data" style="color:#666; padding:10px;">No active detection</div>';
+                return;
+            }
+
+            // Simplified Confidence Panel
+            const html = `
+                <div class="confidence-item">
+                    <span class="confidence-label">Signal</span>
+                    <div class="confidence-bar"><div class="confidence-fill" style="width: ${confidence.signal_strength}%"></div></div>
+                </div>
+                <div class="confidence-item">
+                    <span class="confidence-label">Shape</span>
+                    <div class="confidence-bar"><div class="confidence-fill" style="width: ${confidence.spectral_shape}%"></div></div>
+                </div>
+                <div class="confidence-item">
+                    <span class="confidence-label" style="color:#00d9ff; font-weight:bold;">TOTAL</span>
+                    <div class="confidence-bar" style="border:1px solid #00d9ff;">
+                        <div class="confidence-fill" style="width: ${confidence.overall}%; background: #00d9ff;"></div>
+                    </div>
+                    <span style="margin-left:5px; color:#fff; font-weight:bold;">${confidence.overall}%</span>
+                </div>
+            `;
+            document.getElementById('confidence-content').innerHTML = html;
+        }
+
+        connect();
+    </script>
+</body>
+
+</html>
